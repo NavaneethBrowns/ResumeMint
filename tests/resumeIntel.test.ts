@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildTaskPrompt,
+  careerSpan,
   compactDesignFor,
   computeYears,
   decidePageTarget,
@@ -9,6 +10,7 @@ import {
   normalizeProfile,
   PAGE_LINES,
   parseAiTask,
+  planPages,
   runSmartImport,
   sanitizeOrder,
   type AiTask,
@@ -64,6 +66,8 @@ describe('profile & order', () => {
     const p = normalizeProfile({ seniority: 'lead', yearsExperience: '7.3', pageTarget: '2', strengths: ['a', 5, 'b'] });
     expect(p).toMatchObject({ seniority: 'lead', yearsExperience: 7.5, pageTarget: 2, strengths: ['a', 'b'] });
     expect(normalizeProfile(null)).toMatchObject({ seniority: 'mid', yearsExperience: 0, pageTarget: 1 });
+    expect(normalizeProfile({ pageTarget: 3 }).pageTarget).toBe(3);
+    expect(normalizeProfile({ pageTarget: 9 }).pageTarget).toBe(1);
   });
 
   it('keeps valid unique sections and appends the rest', () => {
@@ -98,6 +102,45 @@ describe('page budget', () => {
     expect(decidePageTarget(profile, big, NOW)).toBe(2);
     expect(decidePageTarget({ ...profile, seniority: 'entry', yearsExperience: 1 }, { ...big, experience: [] }, NOW)).toBe(1);
     expect(decidePageTarget({ ...profile, yearsExperience: 6, seniority: 'mid' }, sampleResume(), NOW)).toBe(1);
+  });
+
+  const projectHeavy = (n: number) => {
+    const d = sampleResume();
+    d.experience = [newTimelineItem({ title: 'Software Intern', startDate: 'Jan 2026', endDate: 'Jun 2026', description: longBullets.slice(0, 2).join('\n') })];
+    d.projects = Array.from({ length: n }, (_, i) => newTimelineItem({ title: `Project ${i}`, link: `github.com/x/p${i}`, description: longBullets.slice(0, 4).join('\n') }));
+    return d;
+  };
+
+  it('lets substantial projects justify a second page, even early in a career', () => {
+    const student = normalizeProfile({ seniority: 'student', yearsExperience: 0 });
+    expect(planPages(student, projectHeavy(6), NOW)).toMatchObject({ pages: 2, reason: expect.stringContaining('6 substantial projects') });
+    expect(decidePageTarget(student, projectHeavy(2), NOW)).toBe(1);
+  });
+
+  it('uses career span (not age) and a research record, up to three pages', () => {
+    const d = sampleResume();
+    d.experience = [
+      newTimelineItem({ title: 'Analyst', startDate: 'Jan 2005', endDate: 'Dec 2008', description: longBullets.join('\n') }),
+      newTimelineItem({ title: 'Consultant', startDate: 'Jan 2024', current: true, description: longBullets.join('\n') }),
+    ];
+    const returner = normalizeProfile({ seniority: 'mid', yearsExperience: 7 });
+    expect(careerSpan(d, NOW)).toBe(21);
+    expect(planPages(returner, d, NOW)).toMatchObject({ pages: 2, reason: expect.stringContaining('career spanning 21 years') });
+
+    const cv = projectHeavy(8);
+    cv.experience = Array.from({ length: 6 }, (_, i) => newTimelineItem({ title: 'Research Fellow', startDate: `Jan ${2004 + i * 3}`, endDate: `Dec ${2006 + i * 3}`, description: longBullets.join('\n') }));
+    cv.awards = Array.from({ length: 12 }, (_, i) => ({ id: `a${i}`, name: `Paper ${i}`, detail: 'Journal · 2020' }));
+    const academic = normalizeProfile({ seniority: 'senior', domain: 'Research/Academia', yearsExperience: 20, pageTarget: 3 });
+    expect(planPages(academic, cv, NOW).pages).toBe(3);
+  });
+
+  it('condenses slight overflow to one page instead of adding a page', () => {
+    const d = sampleResume();
+    d.summary = 'x '.repeat(Math.round((PAGE_LINES * 0.32 * 95) / 2));
+    const senior = normalizeProfile({ seniority: 'senior', yearsExperience: 12 });
+    expect(estimateLines(d) / PAGE_LINES).toBeGreaterThan(1.15);
+    expect(estimateLines(d) / PAGE_LINES).toBeLessThan(1.3);
+    expect(decidePageTarget(senior, d, NOW)).toBe(1);
   });
 
   it('suggests compact typography only for slight overflow', () => {

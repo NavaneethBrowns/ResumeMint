@@ -104,6 +104,7 @@ const Insight = ({ r }: { r: ImportResult }) => {
       </div>
       {p.trajectory && <p className="ai-insight-line">{p.trajectory}</p>}
       {p.rationale && <p className="ai-insight-muted">{p.rationale}</p>}
+      {i.pageReason && <p className="ai-insight-muted">{i.pageReason}</p>}
       {i.notes.length > 0 && (
         <ul className="ai-insight-notes">
           {i.notes.map((n) => (
@@ -211,7 +212,7 @@ export const ImportDialog = () => {
                   <Wand2 size={16} />
                   <span>
                     <b>Recruiter-ready rewrite</b>
-                    <small>Concise, impact-first bullets on one page — two pages only when your experience warrants it. Turn off to keep your exact wording.</small>
+                    <small>Concise, impact-first bullets aiming for one page — more only when your experience, projects or career length need the room. Turn off to keep your exact wording.</small>
                   </span>
                 </span>
                 <Toggle label="" checked={optimise} onChange={setOptimise} />

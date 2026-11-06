@@ -11,6 +11,12 @@ import { normalizeResumeData } from '../parser/normalize';
 export type Seniority = 'student' | 'entry' | 'mid' | 'senior' | 'lead' | 'executive';
 const SENIORITIES: Seniority[] = ['student', 'entry', 'mid', 'senior', 'lead', 'executive'];
 
+export type PageTarget = 1 | 2 | 3;
+const toPageTarget = (v: unknown): PageTarget => {
+  const n = Number(v);
+  return n === 2 || n === 3 ? n : 1;
+};
+
 export interface ResumeProfile {
   primaryRole: string;
   domain: string;
@@ -20,13 +26,13 @@ export interface ResumeProfile {
   trajectory: string;
   strengths: string[];
   region: string;
-  pageTarget: 1 | 2;
+  pageTarget: PageTarget;
   rationale: string;
 }
 
 export type AiTask =
   | { kind: 'import'; text: string; optimise: boolean }
-  | { kind: 'tighten'; resume: unknown; profile: ResumeProfile; pages: 1 | 2; currentLines: number };
+  | { kind: 'tighten'; resume: unknown; profile: ResumeProfile; pages: PageTarget; currentLines: number };
 
 export interface SmartImport {
   data: ResumeData;
@@ -35,6 +41,8 @@ export interface SmartImport {
   notes: string[];
   warnings: string[];
   estimatedPages: number;
+  /** Plain-language reason for the page count, shown to the user. */
+  pageReason: string;
 }
 
 export type ImportStage = 'analysing' | 'tightening';
@@ -80,7 +88,7 @@ const PROFILE_RULES = `STEP 1 — PROFILE the candidate ("profile"):
 - trajectory: one line like "QA Analyst → SDET → Engineering Manager"; mention a career switch, gap, freelancing or return to work if present.
 - strengths: 3-5 short differentiators backed by the resume.
 - region: hiring convention inferred from locations/phone (India, US, UK, EU, Middle East, APAC, Other).
-- pageTarget: 1 by default. Use 2 only for roughly 10+ years, senior/lead/executive candidates with many substantial roles, or research careers with notable publications/grants. Students and entry level: always 1.
+- pageTarget: 1 is optimal and the default — recruiters skim once. Go beyond 1 only when the real content is too substantial to cut without losing signal: about 8+ years of experience, senior/lead/executive scope, 5+ roles, 4+ substantial projects (shipped products, open source with traction, research, patents), a career that began 15+ years ago (first job or degree), or a research record with publications/grants. Use 2 for these; 3 only for academic/research CVs or careers of 20+ years with that much content. Students and entry level stay at 1 unless they have 4+ substantial projects. Judge this from career length and content only — never from age or date of birth.
 - rationale: one sentence explaining the section order and page target.`;
 
 const STRATEGY_RULES = `STEP 2 — SECTION ORDER ("sectionOrder", using only: summary, experience, education, projects, skills, certifications, awards, volunteer, languages, interests):
@@ -92,7 +100,7 @@ const STRATEGY_RULES = `STEP 2 — SECTION ORDER ("sectionOrder", using only: su
 - Adapt to the domain: engineers keep GitHub/portfolio links and tech stacks; designers keep portfolio links; regulated fields (nursing, law, finance, aviation) put licences/certifications high.`;
 
 const REWRITE_RULES = `STEP 3 — REWRITE for a one-glance read within the page budget:
-- Budget: ~${WORDS_PER_PAGE} words for 1 page, ~${WORDS_PER_PAGE * 2 - 100} words for 2 pages. Fill the page well but never spill over.
+- Budget: ~${WORDS_PER_PAGE} words for 1 page, ~${WORDS_PER_PAGE * 2 - 100} words for 2 pages, ~${WORDS_PER_PAGE * 3 - 200} words for 3 pages. Fill the pages well but never spill over; the extra page is for real depth (roles, projects, publications), not longer bullets.
 - personal.title = primaryRole. Location as "City, Country" only. URLs without "https://".
 - summary: 2-3 lines (35-60 words) with primaryRole, years, domain depth and 1-2 proof points from the resume. No "I", no clichés (hard-working, passionate, team player, results-driven).
 - bullets: strong action verb first (past tense; present tense only for the current role), "action + what + measurable result" when the resume supports it, max ~24 words, no "Responsible for", no duplicates across roles.
@@ -152,7 +160,7 @@ export const normalizeProfile = (raw: unknown): ResumeProfile => {
     trajectory: str(p.trajectory, 240),
     strengths: strList(p.strengths, 5, 140),
     region: str(p.region, 40),
-    pageTarget: Number(p.pageTarget) === 2 ? 2 : 1,
+    pageTarget: toPageTarget(p.pageTarget),
     rationale: str(p.rationale, 300),
   };
 };
@@ -182,7 +190,7 @@ export const parseAiTask = (body: unknown): { ok: true; task: AiTask } | { ok: f
         kind: 'tighten',
         resume: b.resume,
         profile: normalizeProfile(b.profile),
-        pages: Number(b.pages) === 2 ? 2 : 1,
+        pages: toPageTarget(b.pages),
         currentLines: Number.isFinite(currentLines) ? Math.min(400, Math.max(1, Math.round(currentLines))) : PAGE_LINES,
       },
     };
@@ -243,16 +251,65 @@ export const computeYears = (experience: TimelineItem[], now = new Date()): numb
   return Math.round((months / 12) * 2) / 2;
 };
 
-/** One page is the default; two pages only when career length and content genuinely warrant it. */
-export const decidePageTarget = (profile: ResumeProfile, data: ResumeData, now = new Date()): 1 | 2 => {
-  const years = Math.max(profile.yearsExperience, computeYears(data.experience, now));
-  if (profile.seniority === 'student' || profile.seniority === 'entry' || years < 5) return 1;
-  const lines = estimateLines(data);
-  const heavy = data.experience.length >= 5 || data.projects.length + data.certifications.length + data.awards.length >= 10;
-  if (years >= 10) return profile.pageTarget === 2 || lines > PAGE_LINES * 1.35 ? 2 : 1;
-  const senior = ['senior', 'lead', 'executive'].includes(profile.seniority);
-  return profile.pageTarget === 2 && (heavy || senior) && lines > PAGE_LINES * 1.15 ? 2 : 1;
+const SCHOOL = /\b(10th|12th|class (x|xii)|ssc|hsc|sslc|cbse|icse|high school|secondary|matriculation)\b/i;
+
+/**
+ * Years since the career began (first job, or first degree finished). Stands in for "age" when
+ * sizing the resume: it reflects how much history there is without reading or showing a birth date.
+ */
+export const careerSpan = (data: ResumeData, now = new Date()): number => {
+  const starts = [
+    ...data.experience.map((e) => toMonthIndex(e.startDate)),
+    ...data.education.filter((e) => !SCHOOL.test(e.title)).map((e) => toMonthIndex(e.endDate) ?? toMonthIndex(e.startDate)),
+  ].filter((m): m is number => m !== null);
+  if (starts.length === 0) return 0;
+  const nowIdx = now.getFullYear() * 12 + now.getMonth();
+  return Math.max(0, Math.floor((nowIdx - Math.min(...starts)) / 12));
 };
+
+export interface PagePlan {
+  pages: PageTarget;
+  reason: string;
+}
+
+const RESEARCH = /research|academi|scien|professor|lecturer|postdoc|ph\.?\s?d|doctor/i;
+/** Overflow the compact typography can absorb, so it never justifies an extra page. */
+const SLACK = 1.15;
+
+/**
+ * One page is the default and the goal. More pages only when the content that survives the
+ * rewrite is still long AND experience, projects, career length or a research record explain why.
+ */
+export const planPages = (profile: ResumeProfile, data: ResumeData, now = new Date()): PagePlan => {
+  const need = estimateLines(data) / PAGE_LINES;
+  if (need <= SLACK) return { pages: 1, reason: 'Fits on one page — the format recruiters prefer.' };
+
+  const years = Math.max(profile.yearsExperience, computeYears(data.experience, now));
+  const span = careerSpan(data, now);
+  const projects = data.projects.filter((p) => bullets(p.description).length >= 2 || (p.link.trim() && bullets(p.description).length > 0)).length;
+  const credentials = data.certifications.length + data.awards.length + data.volunteer.length;
+  const research = RESEARCH.test(`${profile.domain} ${profile.primaryRole}`) || data.education.some((e) => /ph\.?\s?d|doctor/i.test(e.title));
+  const early = profile.seniority === 'student' || profile.seniority === 'entry' || years < 2;
+
+  const signals: string[] = [];
+  if (years >= 8) signals.push(`${years} years of experience`);
+  else if (years >= 5 && ['senior', 'lead', 'executive'].includes(profile.seniority)) signals.push(`${profile.seniority}-level scope`);
+  if (data.experience.length >= 5) signals.push(`${data.experience.length} roles`);
+  if (projects >= 4) signals.push(`${projects} substantial projects`);
+  if (span >= 15 && years < 8) signals.push(`a career spanning ${span} years`);
+  if (research && data.awards.length + projects >= 4) signals.push('a research record');
+  if (credentials >= 10) signals.push(`${credentials} certifications/awards`);
+
+  // A draft only slightly over a page is condensed back to one; early careers need a clear surplus of project work.
+  const eligible = early ? projects >= 4 && need > 1.5 : signals.length > 0 && need > 1.3;
+  if (!eligible) return { pages: 1, reason: 'Condensed to one page — the content tightens well without losing key facts.' };
+
+  const long = research || years >= 20 || span >= 20;
+  const pages: PageTarget = !early && long && need > 2 + SLACK ? 3 : 2;
+  return { pages, reason: `${pages} pages because of ${signals.slice(0, 3).join(', ')}.` };
+};
+
+export const decidePageTarget = (profile: ResumeProfile, data: ResumeData, now = new Date()): PageTarget => planPages(profile, data, now).pages;
 
 // ---------------------------------------------------------------- safety checks
 
@@ -298,8 +355,8 @@ export const toAiShape = (d: ResumeData) => {
 const resumeOf = (raw: Record<string, unknown>) => (raw.resume && typeof raw.resume === 'object' ? raw.resume : raw);
 
 /** Slight overflow is cheaper to fix with denser typography than by cutting more content. */
-export const compactDesignFor = (estimatedPages: number, pageTarget: 1 | 2) =>
-  estimatedPages > pageTarget && estimatedPages <= pageTarget * 1.15 ? { fontScale: 0.94, lineHeight: 1.35, margin: 12, sectionGap: 10 } : undefined;
+export const compactDesignFor = (estimatedPages: number, pageTarget: PageTarget) =>
+  estimatedPages > pageTarget && estimatedPages <= pageTarget * SLACK ? { fontScale: 0.94, lineHeight: 1.35, margin: 12, sectionGap: 10 } : undefined;
 
 // ---------------------------------------------------------------- pipeline
 
@@ -318,7 +375,8 @@ export const runSmartImport = async (text: string, call: (task: AiTask) => Promi
   let data = normalizeResumeData(resumeOf(raw));
   const profile = normalizeProfile(raw.profile);
   const notes = strList(raw.notes, 5);
-  const pages = decidePageTarget(profile, data, opts.now);
+  const plan = planPages(profile, data, opts.now);
+  const pages = plan.pages;
   let lines = estimateLines(data);
 
   if (opts.optimise && lines > pages * PAGE_LINES * 1.05) {
@@ -339,12 +397,16 @@ export const runSmartImport = async (text: string, call: (task: AiTask) => Promi
   }
 
   const unverified = findUnverified(data, text);
+  // If tightening freed whole pages, settle on the smaller count (compact typography covers slight overflow).
+  const fitted = Math.max(1, Math.ceil(lines / PAGE_LINES / SLACK));
+  const finalPages = Math.min(pages, fitted) as PageTarget;
   return {
     data,
-    profile: { ...profile, pageTarget: pages },
+    profile: { ...profile, pageTarget: finalPages },
     order: sanitizeOrder(raw.sectionOrder),
     notes,
     warnings: unverified.map((org) => `"${org}" was not found in your file — please check it.`),
     estimatedPages: Math.round((lines / PAGE_LINES) * 10) / 10,
+    pageReason: finalPages === pages ? plan.reason : `Condensed to ${finalPages === 1 ? 'one page' : `${finalPages} pages`} — it fit after tightening.`,
   };
 };
