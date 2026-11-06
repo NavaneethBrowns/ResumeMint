@@ -5,3 +5,8 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # GEMINI_MODEL is a public model name (e.g. gemini-3.8-flash), not a secret, and it
+  # intentionally matches the client-side default baked into the bundle. Exclude it from
+  # Netlify's secrets scanning so that match doesn't fail the build. Real secrets
+  # (GEMINI_API_KEY, RAZORPAY_KEY_SECRET) stay server-side and are never omitted.
+  SECRETS_SCAN_OMIT_KEYS = "GEMINI_MODEL"
