@@ -1,4 +1,4 @@
-import { callGemini, GeminiError, parseJsonText } from '../src/lib/ai/geminiApi';
+import { callGeminiResilient, GeminiError, parseJsonText } from '../src/lib/ai/geminiApi';
 import { MAX_RESUME_CHARS } from '../src/lib/ai/resumeIntel';
 import { buildAnyPrompt, parseAnyTask, systemFor, temperatureFor } from '../src/lib/ai/tasks';
 
@@ -12,6 +12,9 @@ const WINDOW_MS = 10 * 60_000;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 const hits = new Map<string, number[]>();
+
+/** Cached once per warm instance after a retired/invalid default is auto-resolved to a model the key can use. */
+let resolvedModel: string | undefined;
 
 /** Best-effort per-instance limiter; serverless instances don't share memory, so pair it with a Google Cloud quota. */
 export const isRateLimited = (ip: string, limit: number, now = Date.now()): boolean => {
@@ -54,15 +57,20 @@ export async function handleAiResume(request: Request): Promise<Response> {
   if (!parsed.ok) return json({ error: parsed.error }, 400);
 
   try {
-    const text = await callGemini({
-      key,
-      model: process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL,
-      system: systemFor(parsed.task),
-      prompt: buildAnyPrompt(parsed.task),
-      temperature: temperatureFor(parsed.task),
-      json: true,
-      timeoutMs: 25_000,
-    });
+    const text = await callGeminiResilient(
+      {
+        key,
+        model: resolvedModel || process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL,
+        system: systemFor(parsed.task),
+        prompt: buildAnyPrompt(parsed.task),
+        temperature: temperatureFor(parsed.task),
+        json: true,
+        timeoutMs: 25_000,
+      },
+      (model) => {
+        resolvedModel = model;
+      },
+    );
     return json({ result: parseJsonText(text) });
   } catch (error) {
     const status = error instanceof GeminiError ? error.status : undefined;

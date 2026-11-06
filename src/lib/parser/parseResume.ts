@@ -33,12 +33,22 @@ const PHONE = /(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,5}\)?[\s-]?)?\d{3,5}[\s-]?\d{3,5}
 const URL = /(?:https?:\/\/)?(?:www\.)?[\w-]+(?:\.[\w-]+)+(?:\/[\w\-./?%&=#]*)?/gi;
 const DEGREE = /\b(b\.?\s?tech|m\.?\s?tech|b\.?e\b|m\.?e\b|b\.?sc?|m\.?sc?|b\.?a\b|m\.?a\b|bachelor|master|mba|bba|bca|mca|ph\.?d|diploma|associate|degree|high school|hsc|ssc|class (?:x|xii|10|12)|cbse|icse)/i;
 const PRESENT = /^(present|current|now|till date|ongoing)$/i;
+/** "Technologies Used:", "Tech stack:", "Tools:" etc. — a labelled line that belongs to the current entry, not a new one. */
+const TECH_LABEL = /^(?:technolog(?:y|ies)|tech\s*stack|tools?|environment|frameworks?|platforms?|skills?\s+used|languages?\s+used)\b[^:\n]{0,24}:/i;
 
 const normaliseHeading = (line: string): string =>
-  line.toLowerCase().replace(/[:|_•·]+$/, '').replace(/[^a-z&\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  line
+    .replace(/\([^)]*\)/g, ' ') // drop parentheticals like "(4+ years)" or "(relevant)"
+    .replace(/[|–—-]\s*\d[\d+.\s]*(?:years?|yrs?)?\s*$/i, ' ') // trailing "- 5 years" / "| 2024"
+    .replace(/\b\d[\d+.]*\s*\+?\s*(?:years?|yrs?)\b/gi, ' ') // "4+ years" anywhere
+    .toLowerCase()
+    .replace(/[:|_•·]+$/, '')
+    .replace(/[^a-z&\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 export const detectHeading = (line: string): SectionId | null => {
-  if (line.length > 40 || BULLET.test(line)) return null;
+  if (line.length > 48 || BULLET.test(line)) return null;
   return HEADINGS[normaliseHeading(line)] ?? null;
 };
 
@@ -104,6 +114,10 @@ const parseTimeline = (lines: string[], section: TimelineSectionId): TimelineIte
       if (!cur) start();
       const text = line.replace(BULLET, '');
       cur!.description = cur!.description ? `${cur!.description}\n${text}` : text;
+      continue;
+    }
+    if (cur && TECH_LABEL.test(line)) {
+      cur.description = cur.description ? `${cur.description}\n${line}` : line;
       continue;
     }
     const range = line.match(DATE_RANGE);

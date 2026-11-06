@@ -1,7 +1,6 @@
 import { useSettings } from '../../store/useSettings';
-import { callGemini, GeminiError, parseJsonText } from './geminiApi';
+import { callGeminiResilient, GeminiError, listModels, parseJsonText } from './geminiApi';
 
-const API = 'https://generativelanguage.googleapis.com/v1beta';
 const MAX_INPUT_CHARS = 30_000;
 
 export class AiError extends Error {}
@@ -21,10 +20,10 @@ export const describeHttpError = (status: number, body: string): string => {
   return `Gemini request failed (${status}).`;
 };
 
-/** Calls Gemini with the user's own key, mapping failures to user-facing messages. */
+/** Calls Gemini with the user's own key, mapping failures to user-facing messages. Auto-recovers from a retired model. */
 export const generateWithKey = async (key: string, model: string, prompt: string, json: boolean, system?: string): Promise<string> => {
   try {
-    return await callGemini({ key, model, prompt, json, system });
+    return await callGeminiResilient({ key, model, prompt, json, system }, (resolved) => useSettings.getState().setGeminiModel(resolved));
   } catch (err) {
     console.error('[ai] gemini error', err);
     if (!(err instanceof GeminiError)) throw new AiError('Could not reach Gemini. Check your internet connection or proxy.');
@@ -89,10 +88,10 @@ export const aiImproveText = async (text: string, kind: ImproveKind, context = '
 
 /** Lists Gemini models available to the key that support text generation. */
 export const listGeminiModels = async (key: string): Promise<string[]> => {
-  const res = await fetch(`${API}/models?pageSize=100`, { headers: { 'x-goog-api-key': key } });
-  if (!res.ok) throw new AiError(describeHttpError(res.status, await res.text().catch(() => '')));
-  const payload = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
-  return (payload.models ?? [])
-    .filter((m) => m.supportedGenerationMethods?.includes('generateContent') && /gemini/i.test(m.name) && !/embedding|image|tts|audio|live/i.test(m.name))
-    .map((m) => m.name.replace(/^models\//, ''));
+  try {
+    return await listModels(key);
+  } catch (err) {
+    if (err instanceof GeminiError && err.status) throw new AiError(describeHttpError(err.status, err.body));
+    throw new AiError('Could not reach Gemini. Check your connection.');
+  }
 };

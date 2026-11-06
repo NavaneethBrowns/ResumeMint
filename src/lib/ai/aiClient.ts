@@ -1,6 +1,6 @@
 import { useSettings } from '../../store/useSettings';
 import { AiError, describeHttpError } from './gemini';
-import { callGemini, GeminiError, parseJsonText } from './geminiApi';
+import { callGeminiResilient, GeminiError, parseJsonText } from './geminiApi';
 import { buildAnyPrompt, systemFor, temperatureFor, type AnyAiTask } from './tasks';
 
 export type AiVia = 'own-key' | 'server';
@@ -36,7 +36,10 @@ const ownKeyTransport = (key: string, model: string): Transport => ({
   via: 'own-key',
   run: async (task) => {
     try {
-      const text = await callGemini({ key, model, prompt: buildAnyPrompt(task), system: systemFor(task), json: true, temperature: temperatureFor(task) });
+      const text = await callGeminiResilient(
+        { key, model, prompt: buildAnyPrompt(task), system: systemFor(task), json: true, temperature: temperatureFor(task) },
+        (resolved) => useSettings.getState().setGeminiModel(resolved),
+      );
       return parseJsonText(text);
     } catch (err) {
       if (!(err instanceof GeminiError)) throw new AiError('Could not reach Gemini. Check your internet connection or proxy.');

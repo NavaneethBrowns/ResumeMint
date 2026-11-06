@@ -86,6 +86,33 @@ describe('detectHeading', () => {
     expect(detectHeading('Honors & Awards')).toBe('awards');
     expect(detectHeading('I gained experience in many things')).toBeNull();
   });
+
+  it('tolerates qualifiers after the heading', () => {
+    expect(detectHeading('PROFESSIONAL EXPERIENCE (4+ YEARS)')).toBe('experience');
+    expect(detectHeading('Work Experience - 5 Years')).toBe('experience');
+    expect(detectHeading('Education (Relevant)')).toBe('education');
+  });
+});
+
+describe('experience with inline tech-stack labels', () => {
+  const data = parseResumeText(`PROFESSIONAL EXPERIENCE (4+ YEARS)
+Software Engineer | Apr 2025 - Present
+Onward Technologies | Hyderabad
+Redesigned the eRFQ procurement system by automating vendor validation and approval chains, cutting sourcing cycles by 25% and accelerating time-to-contract.
+Technologies Used: Angular, Node.js, Express, TypeScript, Docker, Kubernetes
+`);
+
+  it('captures the role despite the "(4+ YEARS)" suffix', () => {
+    expect(data.experience).toHaveLength(1);
+    expect(data.experience[0].title).toBe('Software Engineer');
+    expect(data.experience[0].organization).toBe('Onward Technologies');
+    expect(data.experience[0].current).toBe(true);
+  });
+
+  it('keeps the "Technologies Used:" line inside the entry instead of a junk item', () => {
+    expect(data.experience).toHaveLength(1);
+    expect(data.experience[0].description).toMatch(/Technologies Used: Angular/);
+  });
 });
 
 describe('normalizeResumeData', () => {
