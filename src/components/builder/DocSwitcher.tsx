@@ -51,7 +51,9 @@ export const DocSwitcher = () => {
                   ) : (
                     <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</strong>
                   )}
-                  <small>Edited {timeAgo(d.updatedAt)}</small>
+                  <small>
+                    {d.target ? `🎯 ${d.target.position}${d.target.company ? ` · ${d.target.company}` : ''}` : `Edited ${timeAgo(d.updatedAt)}`}
+                  </small>
                 </span>
                 <button className="icon-btn sm" onClick={() => setEditing(d.id)} aria-label="Rename" title="Rename">
                   <Pencil size={13} />

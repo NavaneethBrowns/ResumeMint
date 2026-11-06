@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useDeferredValue } from 'react';
-import { Eye, Gauge, Heart, Maximize2, Minus, Palette, PenLine, Plus, Redo2, Sparkles, Undo2, Upload } from 'lucide-react';
+import { Eye, Gauge, Heart, Maximize2, Minus, Palette, PenLine, Plus, Redo2, Sparkles, Target, Undo2, Upload } from 'lucide-react';
 import { useActiveDoc, useResumeStore } from '../store/useResumeStore';
 import { useSettings } from '../store/useSettings';
 import { useUi } from '../store/useUi';
@@ -12,6 +12,7 @@ import { DocSwitcher } from '../components/builder/DocSwitcher';
 import { ContentEditor } from '../components/editor/ContentEditor';
 import { DesignPanel } from '../components/design/DesignPanel';
 import { AtsPanel } from '../components/ats/AtsPanel';
+import { TailorDialog } from '../components/tailor/TailorDialog';
 import { scoreColor } from '../components/ats/AtsReportView';
 import { ExportMenu } from '../components/export/ExportMenu';
 import { PrintStage, ResumePreview } from '../components/resume/ResumePreview';
@@ -90,6 +91,9 @@ export const Builder = () => {
         <button className="btn btn-ghost btn-sm hide-sm" onClick={() => useUi.getState().setImportOpen(true)}>
           <Upload size={15} /> Import
         </button>
+        <button className="btn btn-ghost btn-sm" onClick={() => useUi.getState().setTailorOpen(true)} title="Tailor your resume to a job posting">
+          <Target size={15} /> <span className="hide-sm">Tailor to job</span>
+        </button>
         <button
           className="icon-btn"
           onClick={() => useUi.getState().setAiSettingsOpen(true)}
@@ -154,6 +158,7 @@ export const Builder = () => {
       </div>
 
       <PrintStage doc={doc} nodeRef={printRef} />
+      <TailorDialog jd={jd} />
     </div>
   );
 };

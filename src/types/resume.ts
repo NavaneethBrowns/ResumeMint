@@ -86,6 +86,15 @@ export interface Design {
   paper: PaperSize;
 }
 
+/** Set on resumes tailored to a specific job posting. */
+export interface JobTargetMeta {
+  company: string;
+  position: string;
+  /** The resume it was tailored from, so the user can tailor that original again for another job. */
+  baseId?: string;
+  createdAt: number;
+}
+
 export interface ResumeDoc {
   id: string;
   name: string;
@@ -93,6 +102,7 @@ export interface ResumeDoc {
   data: ResumeData;
   layout: Layout;
   design: Design;
+  target?: JobTargetMeta;
 }
 
 export type LayoutKind = 'single' | 'sidebar-left' | 'sidebar-right';

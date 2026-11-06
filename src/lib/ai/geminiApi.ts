@@ -52,11 +52,21 @@ export const callGemini = async ({ key, model, prompt, system, json = false, tem
   return text.trim();
 };
 
-/** Parses model JSON output, tolerating Markdown code fences. */
+/** Parses model JSON output, tolerating Markdown code fences and stray text around the object (common with smaller models). */
 export const parseJsonText = <T = unknown>(text: string): T => {
+  const unfenced = text.replace(/^```(?:json)?\s*|\s*```$/g, '');
   try {
-    return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')) as T;
+    return JSON.parse(unfenced) as T;
   } catch {
+    const start = unfenced.indexOf('{');
+    const end = unfenced.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(unfenced.slice(start, end + 1)) as T;
+      } catch {
+        // fall through
+      }
+    }
     throw new GeminiError('Gemini returned an unexpected format.');
   }
 };

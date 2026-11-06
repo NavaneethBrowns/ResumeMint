@@ -21,7 +21,7 @@ npm run build    # type-check + production build
 
 ## AI (optional)
 Uses **Google Gemini**. Two ways to power it:
-- **Site AI bridge** — set `GEMINI_API_KEY` on the server (`.env` locally, Netlify env vars in production) and visitors need no key. `POST /api/ai/resume` only accepts the fixed resume-import tasks (never free-form prompts), checks the origin, caps input size and rate-limits per IP (`AI_RATE_LIMIT`, default 12 requests / 10 min per instance). Also set a quota or budget alert in Google Cloud. Optional `GEMINI_MODEL` (default `gemini-2.5-flash`).
+- **Site AI bridge** — set `GEMINI_API_KEY` on the server (`.env` locally, Netlify env vars in production) and visitors need no key. `POST /api/ai/resume` only accepts the fixed resume tasks — smart import and job tailoring (never free-form prompts), checks the origin, caps input size and rate-limits per IP (`AI_RATE_LIMIT`, default 12 requests / 10 min per instance). Also set a quota or budget alert in Google Cloud. Optional `GEMINI_MODEL` (default `gemini-2.5-flash`).
 - **Own key** — users can paste a free key from https://aistudio.google.com/app/apikey (✨ icon). It is stored in the browser only, calls go directly to Google, and it is tried before the site bridge. Free-tier prompts may be used by Google to improve products.
 
 ### Smart import ("reading the room")
@@ -33,6 +33,16 @@ Uses **Google Gemini**. Two ways to power it:
 5. **Checks** — organisations not found in the source file are flagged for review.
 
 The ATS checker extracts without rewriting, so scores reflect the original resume.
+
+### Tailor to a job
+`src/lib/ai/tailor.ts` (shared by browser and server) adapts an existing resume to one job posting. It **creates a tailored copy** (via the "Tailor to job" toolbar button or the ATS tab) so the original resume is never changed. Built so even small / free-tier models succeed — the code does the hard, checkable work and the model only picks, orders and rewords:
+1. **Number & match** — every resume bullet gets an ID (`E1.2`, `P1.1`, …) and the job's keywords are pre-split into those the resume already shows and those it doesn't. The prompt hands the model these lists so it never has to guess.
+2. **Classify** — the model reads the job's family, seniority and must-haves/nice-to-haves (shown as chips in the result).
+3. **Rewrite** — bullets, summary and skills are reworded in the job's language and reordered by relevance, keeping every fact. Each rewritten bullet must start with the ID it came from.
+4. **Verify** (code, not the model) — a bullet is reverted to the original if it invents a "missing" keyword or a number not in that role; unknown or duplicate bullet IDs are ignored; every experience role is kept; skills not present in the resume are dropped; certifications are only reordered. Missing or unusable AI output falls back to an **offline relevance reorder** (which also runs when AI is off).
+5. **Fit** — the copy is trimmed to its page budget (newest roles keep their bullets) and typography is compacted for slight overflow. Coverage is reported as job keywords **at first glance** (headline, summary, skills, top bullets) before → after, since tailoring can't truthfully add keywords the resume never had. Remaining job requirements are listed as **gaps** to add only if true — never added automatically.
+
+The new copy carries `target` metadata (position · company), appears tagged in the resume switcher, and its job description is pre-loaded into its ATS tab.
 
 ## Support us (Razorpay)
 `#/support` (linked from the landing nav, footer and the builder toolbar) accepts voluntary contributions through Razorpay Checkout — UPI, cards and netbanking in INR, plus cards in USD/EUR/GBP. It mirrors the NutriSutraLife setup:

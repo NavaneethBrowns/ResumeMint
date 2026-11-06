@@ -1,8 +1,9 @@
 import { callGemini, GeminiError, parseJsonText } from '../src/lib/ai/geminiApi';
-import { buildTaskPrompt, MAX_RESUME_CHARS, parseAiTask, SYSTEM_PROMPT } from '../src/lib/ai/resumeIntel';
+import { MAX_RESUME_CHARS } from '../src/lib/ai/resumeIntel';
+import { buildAnyPrompt, parseAnyTask, systemFor, temperatureFor } from '../src/lib/ai/tasks';
 
 /**
- * AI bridge for smart resume import. Only accepts the fixed resume tasks (never free-form prompts),
+ * AI bridge for smart resume import and job tailoring. Only accepts the fixed resume tasks (never free-form prompts),
  * so the server's Gemini key cannot be used as a general-purpose proxy.
  */
 const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -49,15 +50,16 @@ export async function handleAiResume(request: Request): Promise<Response> {
   } catch {
     return json({ error: 'Invalid JSON.' }, 400);
   }
-  const parsed = parseAiTask(body);
+  const parsed = parseAnyTask(body);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
 
   try {
     const text = await callGemini({
       key,
       model: process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL,
-      system: SYSTEM_PROMPT,
-      prompt: buildTaskPrompt(parsed.task),
+      system: systemFor(parsed.task),
+      prompt: buildAnyPrompt(parsed.task),
+      temperature: temperatureFor(parsed.task),
       json: true,
       timeoutMs: 25_000,
     });

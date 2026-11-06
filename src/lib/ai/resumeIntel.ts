@@ -12,7 +12,7 @@ export type Seniority = 'student' | 'entry' | 'mid' | 'senior' | 'lead' | 'execu
 const SENIORITIES: Seniority[] = ['student', 'entry', 'mid', 'senior', 'lead', 'executive'];
 
 export type PageTarget = 1 | 2 | 3;
-const toPageTarget = (v: unknown): PageTarget => {
+export const toPageTarget = (v: unknown): PageTarget => {
   const n = Number(v);
   return n === 2 || n === 3 ? n : 1;
 };
@@ -52,7 +52,7 @@ const MAX_TIGHTEN_CHARS = 45_000;
 /** Rough single-column A4 capacity at default design settings. */
 export const PAGE_LINES = 56;
 const CHARS_PER_LINE = 95;
-const WORDS_PER_PAGE = 560;
+export const WORDS_PER_PAGE = 560;
 
 // ---------------------------------------------------------------- prompts
 
@@ -274,7 +274,7 @@ export interface PagePlan {
 
 const RESEARCH = /research|academi|scien|professor|lecturer|postdoc|ph\.?\s?d|doctor/i;
 /** Overflow the compact typography can absorb, so it never justifies an extra page. */
-const SLACK = 1.15;
+export const SLACK = 1.15;
 
 /**
  * One page is the default and the goal. More pages only when the content that survives the

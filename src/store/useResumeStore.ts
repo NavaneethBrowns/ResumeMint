@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Design, Layout, ResumeData, ResumeDoc, SectionId } from '../types/resume';
+import type { Design, JobTargetMeta, Layout, ResumeData, ResumeDoc, SectionId } from '../types/resume';
 import { defaultLayout, designForTemplate, emptyResume, sampleResume, uid } from '../data/sections';
 import { getTemplate } from '../data/templates';
 
@@ -12,7 +12,7 @@ interface ResumeState {
   past: Snapshot[];
   future: Snapshot[];
   lastEditAt: number;
-  createDoc: (opts?: { data?: ResumeData; templateId?: string; name?: string }) => string;
+  createDoc: (opts?: { data?: ResumeData; templateId?: string; name?: string; layout?: Layout; design?: Design; target?: JobTargetMeta }) => string;
   duplicateDoc: (id: string) => void;
   deleteDoc: (id: string) => void;
   renameDoc: (id: string, name: string) => void;
@@ -82,8 +82,14 @@ export const useResumeStore = create<ResumeState>()(
         future: [],
         lastEditAt: 0,
 
-        createDoc: ({ data, templateId, name } = {}) => {
-          const doc = makeDoc(data ?? emptyResume(), templateId, name ?? 'Untitled Resume');
+        createDoc: ({ data, templateId, name, layout, design, target } = {}) => {
+          const made = makeDoc(data ?? emptyResume(), templateId, name ?? 'Untitled Resume');
+          const doc: ResumeDoc = {
+            ...made,
+            ...(layout ? { layout: structuredClone(layout) } : {}),
+            ...(design ? { design: { ...design } } : {}),
+            ...(target ? { target } : {}),
+          };
           set((s) => ({ docs: [doc, ...s.docs], activeId: doc.id, past: [], future: [] }));
           return doc.id;
         },
