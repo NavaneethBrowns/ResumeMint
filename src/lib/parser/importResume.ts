@@ -1,7 +1,8 @@
 import type { Design, Layout, ResumeData } from '../../types/resume';
 import { DEFAULT_ORDER } from '../../data/sections';
 import { getTemplate } from '../../data/templates';
-import { aiParseResume } from '../ai/gemini';
+import type { ImportStage, SmartImport } from '../ai/resumeIntel';
+import { smartImport, type AiVia } from '../ai/smartImport';
 import { extractResumeText } from './extractText';
 import { normalizeResumeData } from './normalize';
 import { parseResumeText } from './parseResume';
@@ -12,6 +13,17 @@ export interface ImportResult {
   design?: Design;
   text: string;
   method: 'json' | 'ai' | 'heuristic';
+  /** Present when the AI analysed and arranged the resume. */
+  insight?: Omit<SmartImport, 'data'> & { via: AiVia };
+  /** Why AI parsing was skipped, when it was requested but failed. */
+  aiError?: string;
+}
+
+export interface ImportOptions {
+  ai: boolean;
+  /** Rewrite concisely for the adaptive page budget; false extracts the original wording. */
+  optimise: boolean;
+  onStage?: (stage: ImportStage | 'reading') => void;
 }
 
 const sanitizeLayout = (raw: unknown): Layout | undefined => {
@@ -49,8 +61,9 @@ const sanitizeDesign = (raw: unknown): Design | undefined => {
   };
 };
 
-/** Reads a resume file and converts it into structured data (own JSON → exact, otherwise AI or heuristics). */
-export const importResumeFile = async (file: File, useAi: boolean): Promise<ImportResult> => {
+/** Reads a resume file and converts it into structured data (own JSON → exact, otherwise smart AI or offline heuristics). */
+export const importResumeFile = async (file: File, opts: ImportOptions): Promise<ImportResult> => {
+  opts.onStage?.('reading');
   const { text, kind } = await extractResumeText(file);
   if (kind === 'json') {
     const parsed = JSON.parse(text);
@@ -58,12 +71,15 @@ export const importResumeFile = async (file: File, useAi: boolean): Promise<Impo
     return { data: normalizeResumeData(body.data), layout: sanitizeLayout(body.layout), design: sanitizeDesign(body.design), text, method: 'json' };
   }
   if (!text.trim()) throw new Error('No text found. Scanned/image PDFs cannot be read — please upload a text-based PDF or DOCX.');
-  if (useAi) {
+  let aiError: string | undefined;
+  if (opts.ai) {
     try {
-      return { data: await aiParseResume(text), text, method: 'ai' };
+      const { data, ...insight } = await smartImport(text, { optimise: opts.optimise, onStage: opts.onStage });
+      return { data, text, method: 'ai', insight };
     } catch (err) {
       console.warn('[import] AI parse failed, falling back to heuristics', err);
+      aiError = err instanceof Error ? err.message : 'AI parsing failed.';
     }
   }
-  return { data: parseResumeText(text), text, method: 'heuristic' };
+  return { data: parseResumeText(text), text, method: 'heuristic', aiError };
 };

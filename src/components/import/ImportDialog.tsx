@@ -1,13 +1,26 @@
 import { useRef, useState } from 'react';
-import { CheckCircle2, FileUp, Loader2, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileUp, KeyRound, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { useResumeStore } from '../../store/useResumeStore';
 import { useSettings } from '../../store/useSettings';
 import { useUi } from '../../store/useUi';
+import { compactDesignFor, type ImportStage } from '../../lib/ai/resumeIntel';
 import { ACCEPTED_RESUME_TYPES } from '../../lib/parser/extractText';
 import { importResumeFile, type ImportResult } from '../../lib/parser/importResume';
 import { Modal, Toggle, toast } from '../ui/primitives';
 
-export const FileDrop = ({ onFile, busy, label = 'Drop your resume here' }: { onFile: (f: File) => void; busy?: boolean; label?: string }) => {
+export const FileDrop = ({
+  onFile,
+  busy,
+  label = 'Drop your resume here',
+  busyLabel = 'Reading your resume…',
+  hint = 'PDF, DOCX, TXT or a Resumint .json backup · up to 10 MB · processed in your browser',
+}: {
+  onFile: (f: File) => void;
+  busy?: boolean;
+  label?: string;
+  busyLabel?: string;
+  hint?: string;
+}) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
   return (
@@ -27,8 +40,8 @@ export const FileDrop = ({ onFile, busy, label = 'Drop your resume here' }: { on
       }}
     >
       <span className="dz-icon">{busy ? <Loader2 size={24} className="spin" /> : <FileUp size={24} />}</span>
-      <strong>{busy ? 'Reading your resume…' : label}</strong>
-      <small>PDF, DOCX, TXT or a Resumint .json backup · up to 10 MB · processed in your browser</small>
+      <strong>{busy ? busyLabel : label}</strong>
+      <small>{hint}</small>
       <input
         ref={inputRef}
         type="file"
@@ -53,12 +66,64 @@ const summarise = (r: ImportResult) => [
   { label: 'Other', n: r.data.awards.length + r.data.languages.length + r.data.interests.length + r.data.volunteer.length },
 ];
 
+const STAGE_LABEL: Record<ImportStage | 'reading', string> = {
+  reading: 'Reading your resume…',
+  analysing: 'Reading the room — profiling your career…',
+  tightening: 'Condensing to fit your page budget…',
+};
+
+const SENIORITY_LABEL: Record<string, string> = {
+  student: 'Student', entry: 'Entry level', mid: 'Mid level', senior: 'Senior', lead: 'Lead', executive: 'Executive',
+};
+
+const methodText = (r: ImportResult) => {
+  if (r.method === 'json') return 'Restored from backup exactly.';
+  if (r.method === 'heuristic') return 'Parsed with the offline smart parser — double-check dates and titles.';
+  return r.insight?.via === 'own-key' ? 'Analysed with AI using your Gemini key.' : 'Analysed with Resumint AI.';
+};
+
+const Insight = ({ r }: { r: ImportResult }) => {
+  const i = r.insight;
+  if (!i) return null;
+  const p = i.profile;
+  const facts = [
+    p.domain && `${p.domain}${p.industry ? ` · ${p.industry}` : ''}`,
+    `${SENIORITY_LABEL[p.seniority]}${p.yearsExperience ? ` · ${p.yearsExperience} yrs` : ''}`,
+    `${p.pageTarget}-page target · ${i.estimatedPages <= p.pageTarget ? 'fits' : `~${i.estimatedPages} pages`}`,
+  ].filter(Boolean);
+  return (
+    <div className="ai-insight">
+      <div className="ai-insight-head">
+        <Sparkles size={16} />
+        <strong>{p.primaryRole || 'Career profile'}</strong>
+      </div>
+      <div className="ai-insight-tags">
+        {facts.map((f) => (
+          <span key={f as string}>{f}</span>
+        ))}
+      </div>
+      {p.trajectory && <p className="ai-insight-line">{p.trajectory}</p>}
+      {p.rationale && <p className="ai-insight-muted">{p.rationale}</p>}
+      {i.notes.length > 0 && (
+        <ul className="ai-insight-notes">
+          {i.notes.map((n) => (
+            <li key={n}>
+              <Wand2 size={13} /> {n}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 export const ImportDialog = () => {
   const open = useUi((s) => s.importOpen);
   const setOpen = useUi((s) => s.setImportOpen);
   const hasKey = useSettings((s) => Boolean(s.geminiKey));
   const [useAi, setUseAi] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [optimise, setOptimise] = useState(true);
+  const [stage, setStage] = useState<ImportStage | 'reading' | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [mode, setMode] = useState<'new' | 'replace'>('new');
 
@@ -68,14 +133,14 @@ export const ImportDialog = () => {
   };
 
   const onFile = async (file: File) => {
-    setBusy(true);
+    setStage('reading');
     try {
-      setResult(await importResumeFile(file, useAi && hasKey));
+      setResult(await importResumeFile(file, { ai: useAi, optimise, onStage: setStage }));
     } catch (err) {
       console.error('[import]', err);
       toast.error(err instanceof Error ? err.message : 'Import failed.');
     } finally {
-      setBusy(false);
+      setStage(null);
     }
   };
 
@@ -87,6 +152,12 @@ export const ImportDialog = () => {
     else store.updateData(() => result.data);
     if (result.layout) store.updateLayout(() => result.layout!);
     if (result.design) store.updateDesign(result.design);
+    const insight = result.insight;
+    if (insight) {
+      store.updateLayout((l) => ({ ...l, order: insight.order }));
+      const compact = compactDesignFor(insight.estimatedPages, insight.profile.pageTarget);
+      if (compact) store.updateDesign(compact);
+    }
     toast.success('Resume imported — review each section and pick a template.');
     close();
   };
@@ -113,17 +184,42 @@ export const ImportDialog = () => {
     >
       {!result ? (
         <div style={{ display: 'grid', gap: 14 }}>
-          <FileDrop onFile={onFile} busy={busy} />
-          <div className="note" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-              <Sparkles size={16} />
-              {hasKey ? 'AI parsing (Gemini) gives the most accurate result.' : 'Smart offline parser enabled. Add a free Gemini key for AI-grade accuracy.'}
-            </span>
-            {hasKey ? (
+          <FileDrop
+            onFile={onFile}
+            busy={stage !== null}
+            busyLabel={stage ? STAGE_LABEL[stage] : undefined}
+            hint={
+              useAi
+                ? 'PDF, DOCX, TXT or a Resumint .json backup · up to 10 MB · text is analysed by Google Gemini'
+                : 'PDF, DOCX, TXT or a Resumint .json backup · up to 10 MB · processed in your browser'
+            }
+          />
+          <div className="note" style={{ display: 'grid', gap: 10 }}>
+            <div className="import-option">
+              <span>
+                <Sparkles size={16} />
+                <span>
+                  <b>Smart AI import</b>
+                  <small>Profiles your domain, seniority and career path, then arranges sections the way recruiters read them.</small>
+                </span>
+              </span>
               <Toggle label="" checked={useAi} onChange={setUseAi} />
-            ) : (
-              <button className="chip-btn ai" onClick={() => useUi.getState().setAiSettingsOpen(true)}>
-                Connect
+            </div>
+            {useAi && (
+              <div className="import-option">
+                <span>
+                  <Wand2 size={16} />
+                  <span>
+                    <b>Recruiter-ready rewrite</b>
+                    <small>Concise, impact-first bullets on one page — two pages only when your experience warrants it. Turn off to keep your exact wording.</small>
+                  </span>
+                </span>
+                <Toggle label="" checked={optimise} onChange={setOptimise} />
+              </div>
+            )}
+            {useAi && (
+              <button className="chip-btn ai" style={{ justifySelf: 'start' }} onClick={() => useUi.getState().setAiSettingsOpen(true)}>
+                <KeyRound size={13} /> {hasKey ? 'Using your Gemini key' : 'Use my own Gemini key (optional)'}
               </button>
             )}
           </div>
@@ -134,11 +230,22 @@ export const ImportDialog = () => {
             <CheckCircle2 size={36} color="#10b981" />
             <div>
               <h3 style={{ fontSize: 17 }}>{result.data.personal.fullName || 'Resume parsed'}</h3>
-              <p>
-                {result.method === 'json' ? 'Restored from backup exactly.' : result.method === 'ai' ? 'Parsed with Gemini AI.' : 'Parsed with the offline smart parser — double-check dates and titles.'}
-              </p>
+              <p>{methodText(result)}</p>
             </div>
           </div>
+          {result.aiError && (
+            <div className="note warn" style={{ display: 'flex', gap: 8 }}>
+              <AlertTriangle size={16} style={{ flex: 'none' }} />
+              <span>AI was unavailable ({result.aiError}) — used the offline parser instead.</span>
+            </div>
+          )}
+          <Insight r={result} />
+          {result.insight?.warnings.map((w) => (
+            <div key={w} className="note warn" style={{ display: 'flex', gap: 8 }}>
+              <AlertTriangle size={16} style={{ flex: 'none' }} />
+              <span>{w}</span>
+            </div>
+          ))}
           <div className="parsed-summary">
             {summarise(result).map((s) => (
               <div key={s.label} className="stat-box">

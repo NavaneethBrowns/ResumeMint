@@ -39,7 +39,7 @@ export const AtsChecker = () => {
   const onFile = async (file: File) => {
     setBusy(true);
     try {
-      const r = await importResumeFile(file, hasKey);
+      const r = await importResumeFile(file, { ai: hasKey, optimise: false });
       setSource({ kind: 'upload', name: file.name, data: r.data });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not read that file.');

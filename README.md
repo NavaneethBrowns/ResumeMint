@@ -15,12 +15,24 @@ npm run build    # type-check + production build
 - **13 templates** (ATS Classic, Modern, Creative, Executive) built from one renderer + composable styles (`src/data/templates.ts`, `src/styles/resume.css`).
 - **Customise**: accent colour, 12 fonts, size, line height, margins, spacing, paper (A4/Letter), photo/icons, drag-and-drop section order, main/sidebar column per section, rename/hide sections.
 - **Live ATS score**: 25+ offline checks (contact, structure, impact, length, formatting, keywords vs. job description).
-- **Import**: PDF (pdf.js), DOCX (mammoth), TXT, or JSON backup → heuristic parser, or Gemini for higher accuracy.
+- **Import**: PDF (pdf.js), DOCX (mammoth), TXT, or JSON backup → smart AI import (see below), with an offline heuristic parser as fallback.
 - **Export**: PDF (browser print, selectable text), DOCX, PNG, HTML, TXT, JSON.
 - Multiple resumes, undo/redo (Ctrl+Z / Ctrl+Shift+Z), autosave to localStorage.
 
 ## AI (optional)
-Uses the **Google Gemini API free tier**. Create a key at https://aistudio.google.com/app/apikey and paste it in the app (✨ icon). The key is stored in your browser only and calls go directly to Google. Free-tier prompts may be used by Google to improve products.
+Uses **Google Gemini**. Two ways to power it:
+- **Site AI bridge** — set `GEMINI_API_KEY` on the server (`.env` locally, Netlify env vars in production) and visitors need no key. `POST /api/ai/resume` only accepts the fixed resume-import tasks (never free-form prompts), checks the origin, caps input size and rate-limits per IP (`AI_RATE_LIMIT`, default 12 requests / 10 min per instance). Also set a quota or budget alert in Google Cloud. Optional `GEMINI_MODEL` (default `gemini-2.5-flash`).
+- **Own key** — users can paste a free key from https://aistudio.google.com/app/apikey (✨ icon). It is stored in the browser only, calls go directly to Google, and it is tried before the site bridge. Free-tier prompts may be used by Google to improve products.
+
+### Smart import ("reading the room")
+`src/lib/ai/resumeIntel.ts` (shared by browser and server):
+1. **Profile** — the model infers primary role, domain, industry, seniority (student → executive), years of experience (overlaps merged, internships half), career trajectory, region and strengths. Age, date of birth, marital status, religion, photo and similar personal data are never extracted or inferred.
+2. **Strategy** — section order adapts (e.g. freshers: education + projects first; seniors: experience first; career switchers: skills + projects first; academia: education + publications).
+3. **Rewrite** (the "Recruiter-ready rewrite" toggle) — concise, impact-first bullets, bullet budgets by recency, domain-named skill groups. Facts are never invented; every employer and degree is kept.
+4. **Page budget** — one page by default; two only for ~10+ years or senior profiles with heavy content. If the draft overflows, a second "tighten" pass condenses it (rejected if it drops an employer), and slight overflow is absorbed by compact typography.
+5. **Checks** — organisations not found in the source file are flagged for review.
+
+The ATS checker extracts without rewriting, so scores reflect the original resume.
 
 ## Support us (Razorpay)
 `#/support` (linked from the landing nav, footer and the builder toolbar) accepts voluntary contributions through Razorpay Checkout — UPI, cards and netbanking in INR, plus cards in USD/EUR/GBP. It mirrors the NutriSutraLife setup:
@@ -45,7 +57,7 @@ src/
   store/       zustand stores (resumes with history, settings, ui)
   components/  resume renderer, editor, design, ats, import, export, ui primitives
   pages/       Landing, Builder, AtsChecker, Support
-server/        Razorpay order/verify/webhook handlers (server-only)
+server/        Razorpay order/verify/webhook + AI bridge handlers (server-only)
 netlify/       Netlify Functions wrapping server/ handlers
 tests/         vitest unit tests
 ```
