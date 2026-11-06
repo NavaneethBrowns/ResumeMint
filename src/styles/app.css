@@ -111,6 +111,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .menu-item .mi-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--grad-soft); color: var(--brand-700); flex: none; }
 .menu-item strong { display: block; font-size: 13.5px; }
 .menu-item small { color: var(--muted); font-size: 12px; }
+.menu-item.accent .mi-icon { background: var(--grad); color: #fff; }
 .menu-sep { height: 1px; background: var(--line); margin: 6px 4px; }
 .toaster { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .toast { border: 0; padding: 11px 18px; border-radius: 999px; background: var(--ink); color: #fff; font-weight: 600; box-shadow: var(--shadow-lg); animation: rise 0.35s var(--ease); max-width: min(560px, 92vw); }

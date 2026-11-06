@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Check, ChevronDown, Copy, FilePlus2, FileText, Pencil, Sparkle, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, FilePlus2, FileText, Pencil, Sparkle, Target, Trash2 } from 'lucide-react';
 import { useResumeStore } from '../../store/useResumeStore';
+import { useUi } from '../../store/useUi';
 import { sampleResume } from '../../data/sections';
 import { Popover, toast } from '../ui/primitives';
 
@@ -80,6 +81,11 @@ export const DocSwitcher = () => {
           <button className="menu-item" onClick={() => (createDoc({ data: sampleResume(), name: 'Sample Resume' }), close())}>
             <span className="mi-icon"><Sparkle size={16} /></span>
             <span><strong>New from example</strong><small>Edit a polished sample</small></span>
+          </button>
+          <div className="menu-sep" />
+          <button className="menu-item accent" onClick={() => (useUi.getState().setTailorOpen(true), close())}>
+            <span className="mi-icon"><Target size={16} /></span>
+            <span><strong>Tailor to a job…</strong><small>Make a copy matched to a job post</small></span>
           </button>
         </>
       )}

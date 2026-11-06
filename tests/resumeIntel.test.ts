@@ -226,7 +226,7 @@ describe('AI bridge handler', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ result: { ok: true } });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain('gemini-2.5-flash:generateContent');
+    expect(url).toContain('gemini-3.8-flash:generateContent');
     expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('test-key');
   });
 

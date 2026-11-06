@@ -6,7 +6,7 @@ import { buildAnyPrompt, parseAnyTask, systemFor, temperatureFor } from '../src/
  * AI bridge for smart resume import and job tailoring. Only accepts the fixed resume tasks (never free-form prompts),
  * so the server's Gemini key cannot be used as a general-purpose proxy.
  */
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.8-flash';
 const MAX_BODY = MAX_RESUME_CHARS * 2 + 20_000;
 const WINDOW_MS = 10 * 60_000;
 const json = (body: unknown, status = 200) => Response.json(body, { status });

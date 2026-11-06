@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  ArrowRight, CheckCircle2, Download, FileUp, Gauge, Heart, LayoutTemplate, Lock, Palette, ShieldCheck, Sparkles, Wand2, Zap,
+  ArrowRight, CheckCircle2, Download, FileUp, Gauge, Heart, LayoutTemplate, Lock, Palette, ShieldCheck, Sparkles, Target, Wand2, Zap,
 } from 'lucide-react';
 import { TEMPLATES } from '../data/templates';
 import { defaultLayout, designForTemplate, sampleResume } from '../data/sections';
@@ -14,6 +14,7 @@ const CATEGORIES = ['All', 'ATS Classic', 'Modern', 'Creative', 'Executive'] as 
 
 const FEATURES = [
   { icon: LayoutTemplate, title: '13 designer templates', text: 'From Harvard-classic to gradient sidebars. Switch instantly — your content reflows perfectly.' },
+  { icon: Target, title: 'Tailor to each job', text: 'Paste a job post and get a copy of your resume reordered and reworded to match it — keywords, not fiction.' },
   { icon: Gauge, title: 'Live ATS score', text: '25+ checks across parsing, keywords, impact and length, updating as you type.' },
   { icon: FileUp, title: 'Import any resume', text: 'Drop a PDF or DOCX. We extract and rearrange everything into your chosen format.' },
   { icon: Palette, title: 'Deep customisation', text: 'Colours, 12 fonts, spacing, margins, section order, sidebar placement and custom titles.' },
@@ -59,7 +60,7 @@ export const Landing = () => {
         <div className="hero-inner">
           <div>
             <span className="eyebrow">
-              <b>NEW</b> Live ATS scoring + AI polish
+              <b>NEW</b> Tailor your resume to any job with AI
             </span>
             <h1>
               Resumes that look <span className="grad-text">stunning</span> and read perfectly to every ATS.

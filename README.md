@@ -21,7 +21,7 @@ npm run build    # type-check + production build
 
 ## AI (optional)
 Uses **Google Gemini**. Two ways to power it:
-- **Site AI bridge** — set `GEMINI_API_KEY` on the server (`.env` locally, Netlify env vars in production) and visitors need no key. `POST /api/ai/resume` only accepts the fixed resume tasks — smart import and job tailoring (never free-form prompts), checks the origin, caps input size and rate-limits per IP (`AI_RATE_LIMIT`, default 12 requests / 10 min per instance). Also set a quota or budget alert in Google Cloud. Optional `GEMINI_MODEL` (default `gemini-2.5-flash`).
+- **Site AI bridge** — set `GEMINI_API_KEY` on the server (`.env` locally, Netlify env vars in production) and visitors need no key. `POST /api/ai/resume` only accepts the fixed resume tasks — smart import and job tailoring (never free-form prompts), checks the origin, caps input size and rate-limits per IP (`AI_RATE_LIMIT`, default 12 requests / 10 min per instance). Also set a quota or budget alert in Google Cloud. Optional `GEMINI_MODEL` (default `gemini-3.8-flash`).
 - **Own key** — users can paste a free key from https://aistudio.google.com/app/apikey (✨ icon). It is stored in the browser only, calls go directly to Google, and it is tried before the site bridge. Free-tier prompts may be used by Google to improve products.
 
 ### Smart import ("reading the room")
