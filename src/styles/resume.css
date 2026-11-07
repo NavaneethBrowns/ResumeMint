@@ -32,7 +32,8 @@
 .rs-name { font-size: 2.4em; font-weight: 700; line-height: 1.08; letter-spacing: -0.015em; color: var(--rs-ink); }
 .rs-title { font-size: 1.14em; color: var(--rs-accent); font-weight: 500; margin-top: 3px; }
 .rs-contacts { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 0.9em; color: #4b5563; flex-basis: 100%; }
-.rs-contacts li { display: inline-flex; align-items: center; gap: 5px; }
+.rs-contacts li { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; }
+.rs-contacts li a, .rs-contacts li > span:last-child { overflow-wrap: anywhere; min-width: 0; }
 .rs-ic { color: var(--rs-accent); display: inline-flex; }
 .rs-photo { width: 24mm; height: 24mm; border-radius: 50%; object-fit: cover; flex: none; }
 
@@ -53,7 +54,9 @@
 .rs-hd-sidebar .rs-header { padding: 0 0 4px; flex-direction: column; align-items: flex-start; gap: 10px; }
 .rs-hd-sidebar .rs-photo { width: 30mm; height: 30mm; border: 3px solid rgba(255, 255, 255, 0.35); }
 .rs-hd-sidebar .rs-name { font-size: 1.95em; }
-.rs-hd-sidebar .rs-contacts { flex-direction: column; gap: 4px; font-size: 0.88em; }
+.rs-hd-sidebar .rs-contacts { flex-direction: column; gap: 4px; font-size: 0.88em; width: 100%; }
+.rs-hd-sidebar .rs-contacts li { max-width: 100%; min-width: 0; align-items: flex-start; }
+.rs-hd-sidebar .rs-contacts li a, .rs-hd-sidebar .rs-contacts li span { overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
 
 /* ---------- Body / columns ---------- */
 .rs-body { flex: 1; display: flex; align-items: stretch; }
