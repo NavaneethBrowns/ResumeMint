@@ -132,7 +132,17 @@ export const useResumeStore = create<ResumeState>()(
     },
     {
       name: 'resumint:v1',
-      version: 1,
+      version: 2,
+      // v1 shipped with a 'left' default that got written into every saved resume,
+      // so body text stayed left-aligned even after justify became the default.
+      // Upgrade existing docs to the new justified default (users can still pick Left).
+      migrate: (persisted, version) => {
+        const state = persisted as { docs?: ResumeDoc[]; activeId?: string } | undefined;
+        if (state?.docs && version < 2) {
+          state.docs = state.docs.map((d) => ({ ...d, design: { ...d.design, textAlign: 'justify' } }));
+        }
+        return state as never;
+      },
       partialize: (s) => ({ docs: s.docs, activeId: s.activeId }),
     },
   ),
