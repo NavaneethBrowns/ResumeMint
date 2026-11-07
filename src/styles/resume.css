@@ -79,7 +79,7 @@
 
 /* ---------- Sections ---------- */
 .rs-h { font-size: 1.06em; font-weight: 700; color: var(--rs-accent); margin-bottom: 0.55em; letter-spacing: 0.02em; break-after: avoid; page-break-after: avoid; }
-.rs-summary { color: var(--rs-text); text-align: var(--rs-align, left); }
+.rs-summary { color: var(--rs-text); text-align: var(--rs-align, justify); }
 .rs-item { break-inside: avoid; page-break-inside: avoid; }
 .rs-item + .rs-item { margin-top: 0.8em; }
 .rs-item-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
@@ -88,9 +88,9 @@
 .rs-item-sub { color: var(--rs-muted); }
 .rs-item-sub a { color: var(--rs-accent); }
 .rs-item-date { color: var(--rs-muted); font-size: 0.9em; white-space: nowrap; flex: none; font-variant-numeric: tabular-nums; }
-.rs-item-note { color: var(--rs-muted); margin-top: 0.1em; text-align: var(--rs-align, left); }
+.rs-item-note { color: var(--rs-muted); margin-top: 0.1em; text-align: var(--rs-align, justify); }
 .rs-bullets { margin-top: 0.3em; }
-.rs-bullets li { position: relative; padding-left: 1.05em; text-align: var(--rs-align, left); }
+.rs-bullets li { position: relative; padding-left: 1.05em; text-align: var(--rs-align, justify); }
 .rs-bullets li + li { margin-top: 0.2em; }
 .rs-bullets li::before { content: ''; position: absolute; left: 0.25em; top: 0.62em; width: 0.32em; height: 0.32em; border-radius: 50%; background: var(--rs-accent); }
 .rs-aside .rs-item-head { flex-direction: column; gap: 0; }
@@ -173,3 +173,11 @@
 
 .rs-t-monarch .rs-name { font-weight: 700; letter-spacing: 0.02em; }
 .rs-t-monarch .rs-header { border-bottom: 3px double var(--rs-accent); padding-bottom: 10px; margin: 0 var(--rs-pad); padding-left: 0; padding-right: 0; }
+
+
+/* ---------- Inline editing ---------- */
+.rs-edit { outline: none; cursor: text; border-radius: 3px; transition: box-shadow 0.12s ease, background 0.12s ease; }
+.rs-edit:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--rs-accent) 35%, transparent); }
+.rs-edit:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--rs-accent) 60%, transparent); background: color-mix(in srgb, var(--rs-accent) 7%, transparent); }
+.rs-edit:empty::before { content: attr(data-ph); color: var(--rs-muted); opacity: 0.6; }
+.rs-item-sub .rs-edit { display: inline; min-width: 1ch; }

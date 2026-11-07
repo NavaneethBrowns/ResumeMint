@@ -140,7 +140,7 @@ export const Builder = () => {
 
         <main className="canvas">
           <div className="canvas-inner">
-            <ResumePreview doc={previewDoc} zoom={zoom} />
+            <ResumePreview doc={previewDoc} zoom={zoom} editable />
           </div>
           <div className="canvas-tools">
             <button className="icon-btn sm" onClick={() => zoomBy(-1)} aria-label="Zoom out">

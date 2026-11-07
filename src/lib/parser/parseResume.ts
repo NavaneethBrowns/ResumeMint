@@ -122,8 +122,26 @@ const parseTimeline = (lines: string[], section: TimelineSectionId): TimelineIte
     }
     const range = line.match(DATE_RANGE);
     const single = range ? null : line.match(SINGLE_DATE);
+    const hasDate = Boolean(range || single);
+
+    // Continuation of body text, not a new job. PDF/Doc extraction frequently wraps a
+    // single bullet across several physical lines (e.g. "…approval" / "chains, cutting…").
+    // Once the current entry already has a header (title or organization), a dateless line
+    // that reads like prose belongs to the description — never a brand-new timeline entry.
+    if (cur && (cur.title || cur.organization) && !hasDate) {
+      const startsLower = /^[\p{Ll}]/u.test(line);
+      const endsSentence = /[.?!,;:]$/.test(line);
+      const wordCount = line.split(/\s+/).length;
+      if (startsLower || endsSentence || wordCount > 8) {
+        // A lowercase start means the previous line wrapped — stitch it back together.
+        if (startsLower && cur.description) cur.description += ` ${line}`;
+        else cur.description = cur.description ? `${cur.description}\n${line}` : line;
+        continue;
+      }
+    }
+
     const c = cur as TimelineItem | null;
-    const needsNew = !c || Boolean(c.description) || (headerCount >= 2 && Boolean(range || single) && Boolean(c.startDate)) || headerCount >= 3;
+    const needsNew = !c || Boolean(c.description) || (headerCount >= 2 && hasDate && Boolean(c.startDate)) || headerCount >= 3;
     if (needsNew) start();
     const item = cur!;
     let rest = line;

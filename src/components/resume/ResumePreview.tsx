@@ -6,7 +6,7 @@ import { MM_PX, PAPER_MM, ResumeDocument } from './ResumeDocument';
 type DocLike = Pick<ResumeDoc, 'data' | 'layout' | 'design'>;
 
 /** Renders the resume scaled to fit its container, with page-break guides. */
-export const ResumePreview = ({ doc, zoom = 1, fit = true, guides = true }: { doc: DocLike; zoom?: number; fit?: boolean; guides?: boolean }) => {
+export const ResumePreview = ({ doc, zoom = 1, fit = true, guides = true, editable = false }: { doc: DocLike; zoom?: number; fit?: boolean; guides?: boolean; editable?: boolean }) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const docRef = useRef<HTMLElement>(null);
   const [width, setWidth] = useState(0);
@@ -35,7 +35,7 @@ export const ResumePreview = ({ doc, zoom = 1, fit = true, guides = true }: { do
     <div ref={wrapRef} className="preview-fit">
       <div className="preview-stage" style={{ width: pageW * scale, height: Math.max(height, pageH) * scale }}>
         <div className="preview-paper" style={{ transform: `scale(${scale})`, width: pageW }}>
-          <ResumeDocument ref={docRef} {...doc} />
+          <ResumeDocument ref={docRef} {...doc} editable={editable} />
           {guides &&
             Array.from({ length: pages - 1 }, (_, i) => (
               <div key={i} className="page-guide" style={{ top: pageH * (i + 1) }}>

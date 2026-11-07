@@ -8,6 +8,7 @@ export interface ResumeDocumentProps {
   data: ResumeData;
   layout: Layout;
   design: Design;
+  editable?: boolean;
 }
 
 export const PAPER_MM = { A4: { w: 210, h: 297 }, Letter: { w: 215.9, h: 279.4 } } as const;
@@ -21,21 +22,21 @@ export const resumeStyleVars = (design: Design): CSSProperties =>
     '--rs-lh': design.lineHeight,
     '--rs-pad': `${design.margin}mm`,
     '--rs-gap': `${design.sectionGap}px`,
-    '--rs-align': design.textAlign || 'left',
+    '--rs-align': design.textAlign || 'justify',
     '--rs-page-w': `${PAPER_MM[design.paper].w}mm`,
     '--rs-page-h': `${PAPER_MM[design.paper].h}mm`,
   }) as CSSProperties;
 
 /** Pure presentational resume renderer. Every template is a combination of layout/header/heading/skill styles. */
-export const ResumeDocument = forwardRef<HTMLElement, ResumeDocumentProps>(({ data, layout, design }, ref) => {
+export const ResumeDocument = forwardRef<HTMLElement, ResumeDocumentProps>(({ data, layout, design, editable }, ref) => {
   const tpl = getTemplate(design.templateId);
   const sections = visibleSections(data, layout);
   const twoCol = tpl.layout !== 'single';
   const side = twoCol ? sections.filter((s) => layout.sidebar.includes(s)) : [];
   const main = twoCol ? sections.filter((s) => !layout.sidebar.includes(s)) : sections;
   const headerInSide = twoCol && tpl.header === 'sidebar';
-  const header = <Header personal={data.personal} design={design} />;
-  const render = (id: (typeof sections)[number]) => <Section key={id} id={id} data={data} layout={layout} template={tpl} />;
+  const header = <Header personal={data.personal} design={design} editable={editable} />;
+  const render = (id: (typeof sections)[number]) => <Section key={id} id={id} data={data} layout={layout} template={tpl} editable={editable} />;
 
   const className = [
     'rs',

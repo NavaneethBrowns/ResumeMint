@@ -87,7 +87,7 @@ export const designForTemplate = (templateId: string, prev?: Partial<Design>): D
     showPhoto: true,
     showIcons: true,
     paper: 'A4',
-    textAlign: 'left',
+    textAlign: 'justify',
     ...prev,
     templateId: t.id,
     accent: t.accent,

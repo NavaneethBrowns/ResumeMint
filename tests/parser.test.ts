@@ -115,6 +115,34 @@ Technologies Used: Angular, Node.js, Express, TypeScript, Docker, Kubernetes
   });
 });
 
+describe('experience with wrapped / fragmented bullet lines', () => {
+  // Simulates PDF extraction that breaks single bullets across physical lines.
+  const data = parseResumeText(`PROFESSIONAL EXPERIENCE
+Software Engineer | Onward Technologies | Hyderabad
+Apr 2025 - Present
+Redesigned the eRFQ procurement system by automating vendor validation and approval
+chains, cutting sourcing cycles by 25% and accelerating time-to-contract.
+Operational Continuity: Engineered Kubernetes environments with multi-region Okta identity patterns, maintaining 99.5% uptime for mission-critical enterprise workflows.
+Process Efficiency: Established automated SonarQube quality gates and AI error tracking, reducing deployment risk
+by 90% and cutting developer onboarding time.
+`);
+
+  it('produces a single entry with the designation, organization and place', () => {
+    expect(data.experience).toHaveLength(1);
+    expect(data.experience[0].title).toBe('Software Engineer');
+    expect(data.experience[0].organization).toBe('Onward Technologies');
+    expect(data.experience[0].location).toBe('Hyderabad');
+    expect(data.experience[0].current).toBe(true);
+  });
+
+  it('does not turn wrapped sentence fragments into separate roles', () => {
+    const titles = data.experience.map((e) => e.title);
+    expect(titles).not.toContain('chains, cutting sourcing cycles by 25% and accelerating time-to-contract.');
+    // The wrapped fragment is stitched back into the first bullet.
+    expect(data.experience[0].description).toMatch(/approval chains, cutting sourcing cycles/);
+  });
+});
+
 describe('normalizeResumeData', () => {
   it('sanitises untrusted input', () => {
     const data = normalizeResumeData({

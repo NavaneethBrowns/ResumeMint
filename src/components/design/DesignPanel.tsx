@@ -83,7 +83,7 @@ export const DesignPanel = ({ doc }: { doc: ResumeDoc }) => {
           <span className="field-label">Text alignment</span>
           <div className="seg">
             {([['left', 'Left'], ['justify', 'Justify']] as const).map(([val, lbl]) => (
-              <button key={val} className={(design.textAlign || 'left') === val ? 'active' : ''} onClick={() => updateDesign({ textAlign: val })}>
+              <button key={val} className={(design.textAlign || 'justify') === val ? 'active' : ''} onClick={() => updateDesign({ textAlign: val })}>
                 {lbl}
               </button>
             ))}

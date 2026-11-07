@@ -1,7 +1,20 @@
-import type { ReactElement } from 'react';
+import { useEffect, useRef, type ElementType, type ReactElement } from 'react';
 import { Globe, Mail, MapPin, Phone } from 'lucide-react';
-import type { Design, Layout, Personal, ResumeData, SectionId, SimpleItem, SkillGroup, TemplateDef, TimelineItem } from '../../types/resume';
+import type {
+  Design,
+  Layout,
+  Personal,
+  ResumeData,
+  SectionId,
+  SimpleItem,
+  SimpleSectionId,
+  SkillGroup,
+  TemplateDef,
+  TimelineItem,
+  TimelineSectionId,
+} from '../../types/resume';
 import { isSimple, isTimeline } from '../../data/sections';
+import { useResumeStore } from '../../store/useResumeStore';
 import { contactEntries, dateRange, sectionTitle, splitSkills, toBullets, withProtocol, type ContactKey } from '../../lib/text';
 
 const LinkedinIcon = (props: { size: number }) => (
@@ -24,6 +37,79 @@ const ICONS: Record<ContactKey, (p: { size: number }) => ReactElement> = {
   github: GithubIcon,
 };
 
+/**
+ * Click-to-edit text node. Renders a contentEditable element whose text is set
+ * imperatively, so typing never triggers a React re-render (no cursor jumps).
+ * Edits are committed on blur. Enter commits single-line fields; Escape reverts.
+ */
+interface EditableProps {
+  value: string;
+  onCommit: (next: string) => void;
+  as?: ElementType;
+  className?: string;
+  placeholder?: string;
+  multiline?: boolean;
+}
+const Editable = ({ value, onCommit, as: Tag = 'span', className, placeholder, multiline }: EditableProps) => {
+  const ref = useRef<HTMLElement>(null);
+
+  // Keep the DOM text in sync with external changes (undo, imports) without
+  // disturbing the caret while the user is actively editing this node.
+  useEffect(() => {
+    const el = ref.current;
+    if (el && document.activeElement !== el && el.innerText !== value) el.innerText = value;
+  });
+
+  return (
+    <Tag
+      ref={ref as never}
+      className={`rs-edit${className ? ` ${className}` : ''}`}
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      role="textbox"
+      data-ph={placeholder}
+      onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+        if (e.key === 'Escape') {
+          if (ref.current) ref.current.innerText = value;
+          e.currentTarget.blur();
+        }
+        if (!multiline && e.key === 'Enter') {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      onBlur={(e: React.FocusEvent<HTMLElement>) => {
+        const raw = e.currentTarget.innerText;
+        const next = multiline ? raw.replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') : raw.replace(/\s+/g, ' ').trim();
+        if (next !== value) onCommit(next);
+      }}
+    />
+  );
+};
+
+const store = () => useResumeStore.getState();
+const editPersonal = (key: keyof Personal, val: string) =>
+  store().updateData((d) => ({ ...d, personal: { ...d.personal, [key]: val } }));
+const editTimeline = (section: TimelineSectionId, id: string, patch: Partial<TimelineItem>) =>
+  store().updateData((d) => ({ ...d, [section]: d[section].map((it) => (it.id === id ? { ...it, ...patch } : it)) }));
+const editSkill = (id: string, patch: Partial<SkillGroup>) =>
+  store().updateData((d) => ({ ...d, skills: d.skills.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
+const editSimple = (section: SimpleSectionId, id: string, patch: Partial<SimpleItem>) =>
+  store().updateData((d) => ({ ...d, [section]: d[section].map((it) => (it.id === id ? { ...it, ...patch } : it)) }));
+
+/** Parses a free-typed date range ("Jan 2022 - Present", "2015 - 2019") back into fields. */
+const parseDateRange = (text: string): Pick<TimelineItem, 'startDate' | 'endDate' | 'current'> => {
+  const parts = text
+    .split(/\s*(?:\u2013|\u2014|-|\bto\b|\buntil\b|~)\s*/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const startDate = parts[0] ?? '';
+  const end = parts[1] ?? '';
+  const current = /^(present|current|now|ongoing|till date)$/i.test(end);
+  return { startDate, endDate: current ? '' : end, current };
+};
+
 export const Contacts = ({ personal, icons }: { personal: Personal; icons: boolean }) => (
   <ul className="rs-contacts">
     {contactEntries(personal).map((c) => (
@@ -35,101 +121,235 @@ export const Contacts = ({ personal, icons }: { personal: Personal; icons: boole
   </ul>
 );
 
-export const Header = ({ personal, design }: { personal: Personal; design: Design }) => {
+export const Header = ({ personal, design, editable }: { personal: Personal; design: Design; editable?: boolean }) => {
   const photo = design.showPhoto && personal.photo;
   return (
     <header className="rs-header">
       {photo && <img className="rs-photo" src={personal.photo} alt="" />}
       <div className="rs-id">
-        <h1 className="rs-name">{personal.fullName || 'Your Name'}</h1>
-        {personal.title && <p className="rs-title">{personal.title}</p>}
+        {editable ? (
+          <>
+            <Editable
+              as="h1"
+              className="rs-name"
+              value={personal.fullName}
+              placeholder="Your Name"
+              onCommit={(v) => editPersonal('fullName', v)}
+            />
+            <Editable
+              as="p"
+              className="rs-title"
+              value={personal.title}
+              placeholder="Your Title"
+              onCommit={(v) => editPersonal('title', v)}
+            />
+          </>
+        ) : (
+          <>
+            <h1 className="rs-name">{personal.fullName || 'Your Name'}</h1>
+            {personal.title && <p className="rs-title">{personal.title}</p>}
+          </>
+        )}
       </div>
       <Contacts personal={personal} icons={design.showIcons} />
     </header>
   );
 };
 
-const TimelineEntry = ({ item }: { item: TimelineItem }) => {
-  const bullets = toBullets(item.description);
-  const sub = [item.organization, item.location].filter(Boolean).join(' · ');
+const Bullets = ({
+  description,
+  editable,
+  onCommitBullet,
+}: {
+  description: string;
+  editable?: boolean;
+  onCommitBullet: (index: number, value: string) => void;
+}) => {
+  const bullets = toBullets(description);
+  if (bullets.length === 1 && bullets[0].split(' ').length < 14) {
+    return editable ? (
+      <Editable as="p" className="rs-item-note" value={bullets[0]} onCommit={(v) => onCommitBullet(0, v)} />
+    ) : (
+      <p className="rs-item-note">{bullets[0]}</p>
+    );
+  }
+  if (!bullets.length) return null;
+  return (
+    <ul className="rs-bullets">
+      {bullets.map((b, i) =>
+        editable ? (
+          <Editable key={i} as="li" value={b} onCommit={(v) => onCommitBullet(i, v)} />
+        ) : (
+          <li key={i}>{b}</li>
+        ),
+      )}
+    </ul>
+  );
+};
+
+const TimelineEntry = ({ item, section, editable }: { item: TimelineItem; section: TimelineSectionId; editable?: boolean }) => {
+  const sub = [item.organization, item.location].filter(Boolean).join(' \u00b7 ');
   const range = dateRange(item);
+
+  const commitBullet = (index: number, value: string) => {
+    const bullets = toBullets(item.description);
+    if (value.trim()) bullets[index] = value;
+    else bullets.splice(index, 1);
+    editTimeline(section, item.id, { description: bullets.join('\n') });
+  };
+
   return (
     <div className="rs-item">
       <div className="rs-item-head">
         <div className="rs-item-main">
-          <div className="rs-item-title">{item.title}</div>
-          {(sub || item.link) && (
+          {editable ? (
+            <Editable
+              className="rs-item-title"
+              value={item.title}
+              placeholder="Title"
+              onCommit={(v) => editTimeline(section, item.id, { title: v })}
+            />
+          ) : (
+            <div className="rs-item-title">{item.title}</div>
+          )}
+          {editable ? (
             <div className="rs-item-sub">
-              {sub}
-              {item.link && (
-                <>
-                  {sub && ' · '}
-                  <a href={withProtocol(item.link)}>{item.link}</a>
-                </>
-              )}
+              <Editable value={item.organization} placeholder="Organization" onCommit={(v) => editTimeline(section, item.id, { organization: v })} />
+              <span className="rs-sub-sep">{' \u00b7 '}</span>
+              <Editable value={item.location} placeholder="Location" onCommit={(v) => editTimeline(section, item.id, { location: v })} />
             </div>
+          ) : (
+            (sub || item.link) && (
+              <div className="rs-item-sub">
+                {sub}
+                {item.link && (
+                  <>
+                    {sub && ' \u00b7 '}
+                    <a href={withProtocol(item.link)}>{item.link}</a>
+                  </>
+                )}
+              </div>
+            )
           )}
         </div>
-        {range && <div className="rs-item-date">{range}</div>}
+        {editable ? (
+          <Editable
+            className="rs-item-date"
+            value={range}
+            placeholder="Dates"
+            onCommit={(v) => editTimeline(section, item.id, parseDateRange(v))}
+          />
+        ) : (
+          range && <div className="rs-item-date">{range}</div>
+        )}
       </div>
-      {bullets.length === 1 && bullets[0].split(' ').length < 14 ? (
-        <p className="rs-item-note">{bullets[0]}</p>
-      ) : (
-        bullets.length > 0 && (
-          <ul className="rs-bullets">
-            {bullets.map((b, i) => (
-              <li key={i}>{b}</li>
-            ))}
-          </ul>
-        )
+      <Bullets description={item.description} editable={editable} onCommitBullet={commitBullet} />
+    </div>
+  );
+};
+
+const Skills = ({ groups, style, editable }: { groups: SkillGroup[]; style: TemplateDef['skills']; editable?: boolean }) => {
+  const commitTag = (group: SkillGroup, index: number, value: string) => {
+    const tags = splitSkills(group.skills);
+    if (value.trim()) tags[index] = value;
+    else tags.splice(index, 1);
+    editSkill(group.id, { skills: tags.join(', ') });
+  };
+  return (
+    <div className={`rs-skills rs-skills-${style}`}>
+      {groups.map((g) =>
+        style === 'inline' ? (
+          <p key={g.id} className="rs-skill-line">
+            {editable ? (
+              <>
+                <Editable as="strong" value={g.name} placeholder="Group" onCommit={(v) => editSkill(g.id, { name: v })} />
+                {g.name && ': '}
+                <Editable value={g.skills} placeholder="Skills, comma separated" onCommit={(v) => editSkill(g.id, { skills: v })} />
+              </>
+            ) : (
+              <>
+                {g.name && <strong>{g.name}: </strong>}
+                {splitSkills(g.skills).join(', ')}
+              </>
+            )}
+          </p>
+        ) : (
+          <div key={g.id} className="rs-skill-group">
+            {editable ? (
+              <Editable as="div" className="rs-skill-name" value={g.name} placeholder="Group" onCommit={(v) => editSkill(g.id, { name: v })} />
+            ) : (
+              g.name && <div className="rs-skill-name">{g.name}</div>
+            )}
+            <ul className="rs-tags">
+              {splitSkills(g.skills).map((s, i) =>
+                editable ? (
+                  <Editable key={i} as="li" value={s} onCommit={(v) => commitTag(g, i, v)} />
+                ) : (
+                  <li key={s}>{s}</li>
+                ),
+              )}
+            </ul>
+          </div>
+        ),
       )}
     </div>
   );
 };
 
-const Skills = ({ groups, style }: { groups: SkillGroup[]; style: TemplateDef['skills'] }) => (
-  <div className={`rs-skills rs-skills-${style}`}>
-    {groups.map((g) =>
-      style === 'inline' ? (
-        <p key={g.id} className="rs-skill-line">
-          {g.name && <strong>{g.name}: </strong>}
-          {splitSkills(g.skills).join(', ')}
-        </p>
-      ) : (
-        <div key={g.id} className="rs-skill-group">
-          {g.name && <div className="rs-skill-name">{g.name}</div>}
-          <ul className="rs-tags">
-            {splitSkills(g.skills).map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
-        </div>
-      ),
-    )}
-  </div>
-);
-
-const SimpleList = ({ items }: { items: SimpleItem[] }) => (
+const SimpleList = ({ items, section, editable }: { items: SimpleItem[]; section: SimpleSectionId; editable?: boolean }) => (
   <ul className="rs-simple">
     {items.map((it) => (
       <li key={it.id}>
-        <span className="rs-simple-name">{it.name}</span>
-        {it.detail && <span className="rs-simple-detail">{it.detail}</span>}
+        {editable ? (
+          <>
+            <Editable className="rs-simple-name" value={it.name} placeholder="Name" onCommit={(v) => editSimple(section, it.id, { name: v })} />
+            <Editable className="rs-simple-detail" value={it.detail} placeholder="Detail" onCommit={(v) => editSimple(section, it.id, { detail: v })} />
+          </>
+        ) : (
+          <>
+            <span className="rs-simple-name">{it.name}</span>
+            {it.detail && <span className="rs-simple-detail">{it.detail}</span>}
+          </>
+        )}
       </li>
     ))}
   </ul>
 );
 
-export const Section = ({ id, data, layout, template }: { id: SectionId; data: ResumeData; layout: Layout; template: TemplateDef }) => (
+export const Section = ({
+  id,
+  data,
+  layout,
+  template,
+  editable,
+}: {
+  id: SectionId;
+  data: ResumeData;
+  layout: Layout;
+  template: TemplateDef;
+  editable?: boolean;
+}) => (
   <section className={`rs-section rs-sec-${id}`}>
     <h2 className="rs-h">
       <span>{sectionTitle(layout, id)}</span>
     </h2>
     <div className="rs-sec-body">
-      {id === 'summary' && <p className="rs-summary">{data.summary}</p>}
-      {id === 'skills' && <Skills groups={data.skills} style={template.skills} />}
-      {isTimeline(id) && data[id].map((it) => <TimelineEntry key={it.id} item={it} />)}
-      {isSimple(id) && <SimpleList items={data[id]} />}
+      {id === 'summary' &&
+        (editable ? (
+          <Editable
+            as="p"
+            className="rs-summary"
+            value={data.summary}
+            placeholder="Write a short professional summary..."
+            multiline
+            onCommit={(v) => store().updateData((d) => ({ ...d, summary: v }))}
+          />
+        ) : (
+          <p className="rs-summary">{data.summary}</p>
+        ))}
+      {id === 'skills' && <Skills groups={data.skills} style={template.skills} editable={editable} />}
+      {isTimeline(id) && data[id].map((it) => <TimelineEntry key={it.id} item={it} section={id} editable={editable} />)}
+      {isSimple(id) && <SimpleList items={data[id]} section={id} editable={editable} />}
     </div>
   </section>
 );
