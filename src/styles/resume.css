@@ -106,7 +106,7 @@
 
 .rs-simple { display: flex; flex-direction: column; gap: 0.3em; }
 .rs-simple li { display: flex; justify-content: space-between; gap: 10px; }
-.rs-simple-name { font-weight: 600; color: var(--rs-ink); }
+.rs-simple-name { font-weight: 400; color: var(--rs-ink); }
 .rs-simple-detail { color: var(--rs-muted); font-size: 0.92em; text-align: right; }
 .rs-aside .rs-simple li { flex-direction: column; gap: 0; }
 .rs-aside .rs-simple-detail { text-align: left; }
@@ -140,6 +140,10 @@
 .rs-t-minimal .rs-title { color: var(--rs-muted); font-weight: 400; }
 .rs-t-minimal .rs-h { color: var(--rs-muted); font-size: 0.82em; font-weight: 600; }
 .rs-t-minimal .rs-bullets li::before { background: var(--rs-muted); border-radius: 0; width: 0.45em; height: 1px; top: 0.75em; }
+.rs-t-minimal .rs-main { gap: calc(var(--rs-gap) + 5px); }
+.rs-t-minimal .rs-item + .rs-item { margin-top: 1.05em; }
+.rs-t-minimal .rs-item-sub { color: var(--rs-text); margin-top: 0.08em; }
+.rs-t-minimal .rs-bullets { margin-top: 0.4em; }
 
 .rs-t-executive .rs-name { letter-spacing: 0.01em; }
 .rs-t-executive .rs-item-title { font-size: 1.06em; }
