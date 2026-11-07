@@ -21,6 +21,7 @@ export const resumeStyleVars = (design: Design): CSSProperties =>
     '--rs-lh': design.lineHeight,
     '--rs-pad': `${design.margin}mm`,
     '--rs-gap': `${design.sectionGap}px`,
+    '--rs-align': design.textAlign || 'left',
     '--rs-page-w': `${PAPER_MM[design.paper].w}mm`,
     '--rs-page-h': `${PAPER_MM[design.paper].h}mm`,
   }) as CSSProperties;

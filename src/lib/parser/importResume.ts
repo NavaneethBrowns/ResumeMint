@@ -58,6 +58,7 @@ const sanitizeDesign = (raw: unknown): Design | undefined => {
     showPhoto: d.showPhoto !== false,
     showIcons: d.showIcons !== false,
     paper: d.paper === 'Letter' ? 'Letter' : 'A4',
+    textAlign: d.textAlign === 'justify' ? 'justify' : 'left',
   };
 };
 

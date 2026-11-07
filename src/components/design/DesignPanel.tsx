@@ -79,6 +79,16 @@ export const DesignPanel = ({ doc }: { doc: ResumeDoc }) => {
         </select>
         <Slider label="Font size" value={design.fontScale} min={0.85} max={1.15} step={0.01} onChange={(v) => updateDesign({ fontScale: v })} format={(v) => `${Math.round(v * 100)}%`} />
         <Slider label="Line height" value={design.lineHeight} min={1.15} max={1.8} step={0.05} onChange={(v) => updateDesign({ lineHeight: v })} format={(v) => v.toFixed(2)} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="field-label">Text alignment</span>
+          <div className="seg">
+            {([['left', 'Left'], ['justify', 'Justify']] as const).map(([val, lbl]) => (
+              <button key={val} className={(design.textAlign || 'left') === val ? 'active' : ''} onClick={() => updateDesign({ textAlign: val })}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="group">

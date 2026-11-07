@@ -72,6 +72,7 @@ export interface Layout {
 }
 
 export type PaperSize = 'A4' | 'Letter';
+export type TextAlign = 'left' | 'justify';
 
 export interface Design {
   templateId: string;
@@ -84,6 +85,8 @@ export interface Design {
   showPhoto: boolean;
   showIcons: boolean;
   paper: PaperSize;
+  /** Body-text alignment for prose (summary and bullet lines). */
+  textAlign: TextAlign;
 }
 
 /** Set on resumes tailored to a specific job posting. */
